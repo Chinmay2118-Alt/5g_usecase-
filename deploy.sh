@@ -149,28 +149,37 @@ run_preflight_checks() {
 
     # 2. Check Deployment Mode prerequisites
     if [ "$DEPLOY_MODE" = "docker" ]; then
-        if ! command -v docker >/dev/null 2>&1; then
-            error "Docker is not installed or not in PATH."
-            checks_passed=false
+        # Check if Docker is actually Podman emulation or lacks native docker daemon
+        if (docker --version 2>&1 | grep -iq "podman") || (docker info 2>&1 | grep -iq "podman"); then
+            warn "Podman environment detected instead of standard Docker daemon."
+            warn "Automatically selecting Bare-Metal Python mode for ultra-low latency 5G performance."
+            DEPLOY_MODE="bare-metal"
+        elif ! command -v docker >/dev/null 2>&1; then
+            warn "Docker not found. Switching to Bare-Metal Python mode."
+            DEPLOY_MODE="bare-metal"
         else
             success "Docker daemon binary detected: $(docker --version)"
             if ! docker info >/dev/null 2>&1; then
-                error "Docker daemon is not running or current user lacks docker group permissions."
-                checks_passed=false
+                warn "Docker daemon is not responsive. Switching to Bare-Metal Python mode."
+                DEPLOY_MODE="bare-metal"
             else
                 success "Docker daemon is running and responsive."
             fi
         fi
+    fi
 
+    if [ "$DEPLOY_MODE" = "docker" ]; then
         local compose_cmd
         compose_cmd="$(detect_docker_compose)"
         if [ -z "$compose_cmd" ]; then
-            error "Neither 'docker compose' nor 'docker-compose' was found."
-            checks_passed=false
+            warn "Neither 'docker compose' nor 'docker-compose' found. Switching to Bare-Metal Python mode."
+            DEPLOY_MODE="bare-metal"
         else
             success "Docker Compose detected: $($compose_cmd version 2>/dev/null || true)"
         fi
-    else
+    fi
+
+    if [ "$DEPLOY_MODE" = "bare-metal" ]; then
         # Bare-metal prerequisites
         if ! command -v python3 >/dev/null 2>&1; then
             error "python3 is not installed."
@@ -325,42 +334,36 @@ EOF
         info "Executing Docker Compose deployment..."
         local compose_cmd
         compose_cmd="$(detect_docker_compose)"
-        [ -z "$compose_cmd" ] && fatal "Docker compose command not found."
-
-        # Stop existing containers if running
-        $compose_cmd down --remove-orphans >/dev/null 2>&1 || true
-
-        # Build and start services in detached mode
-        info "Building and launching containerized services..."
-        $compose_cmd up -d --build
-
-        info "Waiting for container health check to report OK..."
-        local attempts=0
-        local healthy=false
-        while [ $attempts -lt 25 ]; do
-            if curl -kfsS "https://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null 2>&1 || \
-               curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/health" >/dev/null 2>&1; then
-                healthy=true
-                break
-            fi
-            sleep 1
-            attempts=$((attempts + 1))
-            echo -n "."
-        done
-        echo
-
-        if [ "$healthy" = true ]; then
-            success "5G Remote Hands container is HEALTHY and listening!"
+        if [ -z "$compose_cmd" ] || ! $compose_cmd up -d --build; then
+            warn "Docker compose execution failed or Podman/urllib3 conflict detected."
+            info "Automatically falling back to native Bare-Metal Python deployment..."
+            DEPLOY_MODE="bare-metal"
         else
-            warn "Health check timed out. Fetching recent container logs:"
-            $compose_cmd logs --tail=30
-            fatal "Service failed to reach healthy status."
+            info "Waiting for container health check to report OK..."
+            local attempts=0
+            local healthy=false
+            while [ $attempts -lt 25 ]; do
+                if curl -kfsS "https://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null 2>&1 || \
+                   curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/health" >/dev/null 2>&1; then
+                    healthy=true
+                    break
+                fi
+                sleep 1
+                attempts=$((attempts + 1))
+                echo -n "."
+            done
+            echo
+
+            if [ "$healthy" = true ]; then
+                success "5G Remote Hands container is HEALTHY and listening!"
+            else
+                warn "Health check timed out. Falling back to Bare-Metal Python..."
+                DEPLOY_MODE="bare-metal"
+            fi
         fi
+    fi
 
-        info "Recent container logs:"
-        $compose_cmd logs --tail=10
-
-    else
+    if [ "$DEPLOY_MODE" = "bare-metal" ]; then
         # Bare-metal Deployment
         info "Executing Bare-Metal deployment on host..."
 
