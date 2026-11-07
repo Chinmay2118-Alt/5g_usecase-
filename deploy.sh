@@ -384,21 +384,60 @@ EOF
         fi
         "$SCRIPT_DIR/.venv/bin/python" -m server.certs "${cert_args[@]}"
 
-        # Install systemd service if systemctl exists and root/sudo available
-        if command -v systemctl >/dev/null 2>&1 && [ -w /etc/systemd/system ]; then
-            info "Installing systemd unit file /etc/systemd/system/5g-remote-hands.service..."
-            sed -e "s|User=ubuntu|User=$(whoami)|g" \
-                -e "s|Group=ubuntu|Group=$(id -gn)|g" \
-                -e "s|/opt/5g-remote-hands|$SCRIPT_DIR|g" \
-                "$SCRIPT_DIR/5g-remote-hands.service" > /etc/systemd/system/5g-remote-hands.service
+        local actual_user="${SUDO_USER:-$(whoami)}"
+        local actual_group
+        actual_group="$(id -gn "$actual_user" 2>/dev/null || echo "$actual_user")"
 
-            systemctl daemon-reload
-            systemctl enable 5g-remote-hands.service
-            systemctl restart 5g-remote-hands.service
-            success "Systemd service 5g-remote-hands started and enabled on boot."
+        # Install systemd service if systemctl exists
+        if command -v systemctl >/dev/null 2>&1; then
+            info "Configuring systemd service /etc/systemd/system/5g-remote-hands.service..."
+            local tmp_svc
+            tmp_svc="$(mktemp)"
+            sed -e "s|User=ubuntu|User=${actual_user}|g" \
+                -e "s|Group=ubuntu|Group=${actual_group}|g" \
+                -e "s|/opt/5g-remote-hands|$SCRIPT_DIR|g" \
+                "$SCRIPT_DIR/5g-remote-hands.service" > "$tmp_svc"
+
+            if [ -w /etc/systemd/system ]; then
+                cp "$tmp_svc" /etc/systemd/system/5g-remote-hands.service
+                systemctl daemon-reload
+                systemctl enable 5g-remote-hands.service
+                systemctl restart 5g-remote-hands.service
+            elif command -v sudo >/dev/null 2>&1; then
+                sudo cp "$tmp_svc" /etc/systemd/system/5g-remote-hands.service
+                sudo systemctl daemon-reload
+                sudo systemctl enable 5g-remote-hands.service
+                sudo systemctl restart 5g-remote-hands.service
+            fi
+            rm -f "$tmp_svc"
+
+            info "Waiting for service health check to report OK..."
+            local attempts=0
+            local healthy=false
+            while [ $attempts -lt 25 ]; do
+                if curl -kfsS "https://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null 2>&1 || \
+                   curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/health" >/dev/null 2>&1; then
+                    healthy=true
+                    break
+                fi
+                sleep 1
+                attempts=$((attempts + 1))
+                echo -n "."
+            done
+            echo
+
+            if [ "$healthy" = true ]; then
+                success "5G Remote Hands service is HEALTHY and listening on port ${SERVER_PORT}!"
+            else
+                warn "Health check timed out. Fetching recent service logs:"
+                if command -v sudo >/dev/null 2>&1; then
+                    sudo journalctl -u 5g-remote-hands.service -n 25 --no-pager || true
+                fi
+            fi
         else
-            warn "Cannot write to /etc/systemd/system. You can run manually via:"
-            echo "  $SCRIPT_DIR/.venv/bin/python -m server.main --scenario $SCENARIO --port $SERVER_PORT"
+            info "Starting service directly in background with nohup..."
+            nohup "$SCRIPT_DIR/.venv/bin/python" -m server.main --scenario "$SCENARIO" --port "$SERVER_PORT" > "$SCRIPT_DIR/logs/server.log" 2>&1 &
+            sleep 3
         fi
     fi
 
