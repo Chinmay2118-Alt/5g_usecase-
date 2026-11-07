@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5G Remote Hands — Operator</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #14171c; color: #e2e8f0;
+                 font: 14px/1.4 system-ui, sans-serif; }
+    #panel { position: absolute; top: 12px; left: 12px; max-width: 360px; padding: 12px 14px;
+             background: rgba(10,14,22,0.8); border-radius: 10px; }
+    #panel h1 { font-size: 16px; margin: 0 0 6px; }
+    #status { color: #93c5fd; margin-bottom: 8px; }
+    kbd { background: #2d3748; border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace; }
+    details { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <h1>5G Remote Hands — operator</h1>
+    <div id="status">connecting…</div>
+    <div>Task: put 2 cubes in the bin.</div>
+    <details open>
+      <summary>Quest controllers</summary>
+      Hold <b>grip</b> = clutch (robot moves only while held) ·
+      left stick = move X/Z · right stick = up/down · hold <b>right trigger</b> = close gripper ·
+      <b>A</b> arm · <b>B</b> disarm · <b>X</b> re-centre · <b>Y</b> stop
+    </details>
+    <details>
+      <summary>Keyboard (desktop testing)</summary>
+      Hold <kbd>Space</kbd> = clutch · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move ·
+      <kbd>E</kbd>/<kbd>Q</kbd> up/down · hold <kbd>F</kbd> = close gripper ·
+      <kbd>R</kbd> arm · <kbd>T</kbd> disarm · <kbd>X</kbd> stop
+    </details>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

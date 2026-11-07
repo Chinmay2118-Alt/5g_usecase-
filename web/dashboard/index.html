@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5G Remote Hands — Dashboard</title>
+  <style>
+    :root { --bg: #0f1216; --card: #181c23; --line: #2a303a; --text: #e2e8f0; --muted: #94a3b8;
+            --ok: #4ade80; --warn: #facc15; --bad: #f87171; --accent: #38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+    header { display: flex; align-items: baseline; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    header h1 { font-size: 20px; margin: 0; }
+    header .path { color: var(--muted); font-size: 13px; }
+    main { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(300px, 1.2fr); gap: 16px; padding: 16px 20px; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+    canvas { width: 100%; display: block; border-radius: 8px; background: #11151b; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+    .tile { background: #11151b; border-radius: 10px; padding: 10px 12px; }
+    .tile .k { color: var(--muted); font-size: 12px; }
+    .tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .tile .v small { font-size: 14px; font-weight: 500; color: var(--muted); }
+    .banner { display: none; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; font-weight: 700; font-size: 18px; }
+    .banner.show { display: block; }
+    .banner.bad { background: #7f1d1d; } .banner.warn { background: #78350f; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+    button { background: #263040; color: var(--text); border: 1px solid #3a4658; border-radius: 8px;
+             padding: 8px 12px; font: inherit; cursor: pointer; }
+    button:hover { background: #2f3b4f; }
+    button.on { background: var(--accent); color: #062033; border-color: var(--accent); font-weight: 700; }
+    button.danger { background: #7f1d1d; border-color: #991b1b; }
+    input { background: #11151b; color: var(--text); border: 1px solid #3a4658; border-radius: 8px; padding: 7px 10px; font: inherit; width: 140px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 13px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; color: var(--muted); }
+    .legend i { width: 14px; height: 3px; display: inline-block; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>5G Remote Hands</h1>
+    <span class="path">Quest → 5G AP → private 5G (LPRU · CU-DU · core) → edge server (sim robot + safety)</span>
+    <span class="path" id="conn">connecting…</span>
+  </header>
+  <main>
+    <section class="card">
+      <div id="banner" class="banner"></div>
+      <h2>Hazard zone (top view)</h2>
+      <canvas id="top" width="640" height="460"></canvas>
+      <p class="muted">Orange: gripper · ring size = height · squares: cubes · yellow box: workspace limits · operator is at the bottom.</p>
+    </section>
+    <section style="display:grid; gap:16px; align-content:start">
+      <div class="card">
+        <h2>Live link</h2>
+        <div class="tiles">
+          <div class="tile"><div class="k">RTT p50 (Quest-measured)</div><div class="v" id="p50">—</div></div>
+          <div class="tile"><div class="k">RTT p95</div><div class="v" id="p95">—</div></div>
+          <div class="tile"><div class="k">Added delay</div><div class="v" id="added">0 <small>ms</small></div></div>
+          <div class="tile"><div class="k">Commands</div><div class="v" id="hz">— <small>Hz</small></div></div>
+          <div class="tile"><div class="k">Robot</div><div class="v" id="robot">—</div></div>
+          <div class="tile"><div class="k">Task</div><div class="v" id="task">—</div></div>
+        </div>
+        <p class="muted" id="reason"></p>
+      </div>
+      <div class="card">
+        <h2>RTT over time</h2>
+        <canvas id="chart" width="640" height="200"></canvas>
+        <div class="legend"><span><i style="background:#38bdf8"></i>p50</span><span><i style="background:#f472b6"></i>p95</span><span><i style="background:#64748b"></i>added delay</span></div>
+      </div>
+      <div class="card">
+        <h2>Experiment controls</h2>
+        <div class="row"><span class="muted" style="width:110px">Added RTT</span>
+          <span id="delays"></span></div>
+        <div class="row"><span class="muted" style="width:110px">Link</span>
+          <button id="cut" class="danger">Cut link</button>
+          <button id="restore">Restore link</button></div>
+        <div class="row"><span class="muted" style="width:110px">Safety</span>
+          <button id="intruder">Person enters workspace (AI stop)</button>
+          <button id="stop" class="danger">STOP robot</button></div>
+        <div class="row"><span class="muted" style="width:110px">Run</span>
+          <input id="pid" placeholder="participant, e.g. P01">
+          <button id="start">Start run</button>
+          <button id="reset">Reset cubes</button></div>
+        <p class="muted" id="run"></p>
+      </div>
+      <div class="card">
+        <h2>Completed tasks</h2>
+        <table><thead><tr><th>Run</th><th>Participant</th><th>Added RTT</th><th>Measured RTT p50</th><th>Task time</th></tr></thead>
+          <tbody id="results"><tr><td colspan="5" class="muted">No completed tasks yet.</td></tr></tbody></table>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

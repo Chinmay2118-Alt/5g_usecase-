@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rescue Rover — Command Dashboard</title>
+  <style>
+    :root { --bg: #0f1216; --card: #181c23; --line: #2a303a; --text: #e2e8f0; --muted: #94a3b8;
+            --ok: #4ade80; --warn: #facc15; --bad: #f87171; --accent: #38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+    header { display: flex; align-items: baseline; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    header h1 { font-size: 20px; margin: 0; }
+    header .path { color: var(--muted); font-size: 13px; }
+    main { display: grid; grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 1fr); gap: 16px; padding: 16px 20px; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+    canvas { width: 100%; display: block; border-radius: 8px; background: #11151b; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+    .tile { background: #11151b; border-radius: 10px; padding: 10px 12px; }
+    .tile .k { color: var(--muted); font-size: 12px; }
+    .tile .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .tile .v small { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .banner { display: none; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; font-weight: 700; font-size: 18px; }
+    .banner.show { display: block; }
+    .banner.bad { background: #7f1d1d; } .banner.warn { background: #78350f; } .banner.good { background: #14532d; }
+    .why { margin-left: auto; color: #062033; background: #fbbf24; border-radius: 999px; padding: 6px 14px; font-weight: 700; text-decoration: none; }
+    .stopcard { display: none; margin-top: 10px; padding: 12px 14px; border-radius: 10px; font-size: 15px; }
+    .stopcard.show { display: block; } .stopcard.ok { background: #14532d; } .stopcard.bad { background: #7f1d1d; } .stopcard.info { background: #263040; }
+    .stopcard b { font-size: 18px; }
+    #profiles button.on { background: #fbbf24; border-color: #fbbf24; color: #1c1300; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+    .row > .muted:first-child { width: 110px; }
+    button { background: #263040; color: var(--text); border: 1px solid #3a4658; border-radius: 8px;
+             padding: 8px 12px; font: inherit; cursor: pointer; }
+    button:hover { background: #2f3b4f; }
+    button.on { background: var(--accent); color: #062033; border-color: var(--accent); font-weight: 700; }
+    button.danger { background: #7f1d1d; border-color: #991b1b; }
+    select { background: #11151b; color: var(--text); border: 1px solid #3a4658; border-radius: 8px; padding: 6px 10px; font: inherit; margin-left: 6px; }
+    input { background: #11151b; color: var(--text); border: 1px solid #3a4658; border-radius: 8px; padding: 7px 10px; font: inherit; width: 150px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 13px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; color: var(--muted); }
+    .legend i { width: 12px; height: 12px; display: inline-block; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">Rescue rover — command dashboard</h1>
+    <label class="path">Scenario <select id="scenario"></select></label>
+    <span class="path">Quest → 5G AP → private 5G (LPRU · CU-DU · core) → edge server (rover sim + safety)</span>
+    <span class="path" id="conn">connecting…</span>
+    <a class="why" href="/why5g/" target="_blank">Why 5G? ↗</a>
+  </header>
+  <main>
+    <section class="card">
+      <div id="banner" class="banner"></div>
+      <h2 id="areaTitle">Disaster area (240 m × 240 m)</h2>
+      <canvas id="map" width="720" height="720"></canvas>
+      <div class="legend" style="margin-top:8px">
+        <span id="legendHazard"></span>
+        <span><i style="background:#ef4444"></i>survivor</span>
+        <span><i style="background:#22c55e"></i>camp</span>
+        <span><i style="background:#f59e0b"></i>rover</span>
+      </div>
+    </section>
+    <section style="display:grid; gap:16px; align-content:start">
+      <div class="card">
+        <h2>Mission</h2>
+        <div class="tiles">
+          <div class="tile"><div class="k">Rescued</div><div class="v" id="rescued">—</div></div>
+          <div class="tile"><div class="k">On board</div><div class="v" id="onboard">—</div></div>
+          <div class="tile"><div class="k">Mission time</div><div class="v" id="time">—</div></div>
+          <div class="tile"><div class="k">Rover mode</div><div class="v" id="mode">—</div></div>
+          <div class="tile"><div class="k">Speed</div><div class="v" id="speed">—</div></div>
+          <div class="tile" style="grid-column: span 2"><div class="k">Hazard</div><div class="v" id="level" style="font-size:16px">—</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Live 5G link</h2>
+        <div class="tiles">
+          <div class="tile"><div class="k">RTT p50 (Quest-measured)</div><div class="v" id="p50">—</div></div>
+          <div class="tile"><div class="k">RTT p95</div><div class="v" id="p95">—</div></div>
+          <div class="tile"><div class="k">Emulated delay (RTT)</div><div class="v" id="added">0 <small>ms</small></div></div>
+          <div class="tile"><div class="k">Commands</div><div class="v" id="hz">— <small>Hz</small></div></div>
+        </div>
+        <canvas id="chart" width="640" height="180" style="margin-top:10px"></canvas>
+        <p class="muted" id="reason"></p>
+      </div>
+      <div class="card">
+        <h2>Experiment controls</h2>
+        <div class="row"><span class="muted">Network</span><span id="profiles"></span></div>
+        <div class="row"><span class="muted">Extra delay</span><span id="delays"></span></div>
+        <div class="row"><span class="muted">Link</span>
+          <button id="cut" class="danger">Cut link</button><button id="restore">Restore link</button></div>
+        <div class="row"><span class="muted" id="hazardName">Hazard</span><span id="hazardBtns"></span></div>
+        <div class="row"><span class="muted">Safety</span>
+          <button id="person">Person crosses road (AI stop)</button>
+          <button id="stop" class="danger">STOP rover</button></div>
+        <div class="row"><span class="muted">Run</span>
+          <input id="pid" placeholder="participant, e.g. P01">
+          <button id="start">Start run</button><button id="reset">Reset mission</button></div>
+        <p class="muted" id="run"></p>
+        <div id="stopcard" class="stopcard"></div>
+      </div>
+      <div class="card">
+        <h2>Completed missions</h2>
+        <table><thead><tr><th>Scenario</th><th>Network</th><th>Participant</th><th>Extra delay</th><th>RTT p50</th><th>Rescued</th><th>Collisions</th><th>Mission time</th></tr></thead>
+          <tbody id="results"><tr><td colspan="8" class="muted">No completed missions yet.</td></tr></tbody></table>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

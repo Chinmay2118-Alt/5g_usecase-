@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rescue Rover — Operator</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #161c26; color: #e2e8f0;
+                 font: 14px/1.4 system-ui, sans-serif; }
+    #panel { position: absolute; top: 12px; left: 12px; max-width: 380px; padding: 12px 14px;
+             background: rgba(10,14,22,0.82); border-radius: 10px; }
+    #panel h1 { font-size: 16px; margin: 0 0 6px; }
+    #status { color: #93c5fd; margin-bottom: 8px; }
+    kbd { background: #2d3748; border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace; }
+    details { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <h1>Rescue rover — operator <span id="scName" style="color:#fbbf24"></span></h1>
+    <div id="status">connecting…</div>
+    <div>Mission: bring all 5 survivors (red SOS beacons) to the rescue camp. Stop next to their house for 2 s to load (2 at a time), then drive into the green camp ring. The experimenter picks the disaster: flood, earthquake, wildfire or landslide.</div>
+    <details open>
+      <summary>Quest controllers</summary>
+      Point the <b>right laser</b> at the map and pull <b>trigger</b> = send the rover ·
+      hold <b>grip</b> = drive it yourself (left stick throttle, right stick turn) ·
+      <b>A</b> arm · <b>B</b> cancel route · <b>Y</b> stop · <b>X</b> switch view (cockpit / table) · click <b>left stick</b> = re-centre.
+      In VR you start in the <b>cockpit</b>: you see through the rover's front camera, with a map tablet on the dashboard to point at.
+    </details>
+    <details>
+      <summary>Keyboard and mouse (desktop testing)</summary>
+      <b>Click</b> the map = send the rover · right-drag = orbit · wheel = zoom ·
+      hold <kbd>Space</kbd> + <kbd>W</kbd>/<kbd>S</kbd>/<kbd>A</kbd>/<kbd>D</kbd> = drive ·
+      <kbd>R</kbd> arm · <kbd>T</kbd> disarm · <kbd>X</kbd> stop · <kbd>C</kbd> cancel route · <kbd>V</kbd> cockpit / table view
+    </details>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

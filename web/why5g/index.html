@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why 5G? — Rescue Rover</title>
+  <style>
+    :root { --bg: #0f1216; --card: #181c23; --line: #2a303a; --text: #e2e8f0; --muted: #94a3b8;
+            --ok: #4ade80; --mid: #facc15; --bad: #f87171; --accent: #fbbf24; --blue: #38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 60px; }
+    header { padding: 36px 0 18px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+    header h1 { margin: 0 0 6px; font-size: 34px; }
+    header p { margin: 0; color: var(--muted); font-size: 18px; max-width: 900px; }
+    .live { display: inline-flex; gap: 8px; align-items: center; margin-top: 14px; padding: 6px 12px;
+            border-radius: 999px; background: #14532d; font-weight: 600; }
+    .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); display: inline-block; animation: p 1.6s infinite; }
+    @keyframes p { 50% { opacity: .3; } }
+    h2 { font-size: 22px; margin: 38px 0 6px; }
+    h2 small { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+    .lead { color: var(--muted); margin: 0 0 14px; max-width: 900px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+    .card h3 { margin: 0 0 4px; font-size: 17px; }
+    .card .tag { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .card p { margin: 6px 0 0; color: #cbd5e0; font-size: 15px; }
+    .card .demo { margin-top: 10px; font-size: 13px; color: var(--blue); }
+    .need { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .need div { background: var(--card); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 14px; }
+    .need b { display: block; }
+    .need span { color: var(--muted); font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 14px; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #11151b; color: var(--muted); font-weight: 600; }
+    th.hl, td.hl { background: rgba(251,191,36,0.08); }
+    td.good { color: var(--ok); } td.mid { color: var(--mid); } td.bad { color: var(--bad); }
+    canvas { width: 100%; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+    .note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .big { font-size: 26px; font-weight: 800; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+    svg text { font-family: system-ui, sans-serif; }
+    .empty { color: var(--muted); text-align: center; padding: 18px; }
+    a { color: var(--blue); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Why private 5G + edge computing for remote rescue robots?</h1>
+    <p>A rescue rover is driven from a VR headset over the lab's private 5G network, with the safety layer and the AI
+      running on an edge server (MEC) next to the 5G core. Below: what the robot needs, why 5G provides it, and a
+      side-by-side comparison measured live in this demo.</p>
+    <div class="live"><i></i><span id="liveText">Live link: waiting for the headset…</span></div>
+  </header>
+
+  <h2>What a teleoperated rescue robot needs from the network</h2>
+  <div class="need">
+    <div><b>Low, predictable latency</b><span>to steer precisely and to stop in time</span></div>
+    <div><b>High uplink bandwidth</b><span>live camera video flows up from the robot</span></div>
+    <div><b>Reliability</b><span>a stalled link means a robot with nobody in control</span></div>
+    <div><b>Local processing</b><span>AI and safety decisions close to the robot</span></div>
+    <div><b>Coverage &amp; mobility</b><span>the robot moves across a whole disaster site</span></div>
+    <div><b>Security</b><span>a private network, not the open internet</span></div>
+  </div>
+
+  <h2>Why private 5G + MEC <small>each card points to where this demo shows it</small></h2>
+  <div class="grid">
+    <div class="card"><div class="tag">URLLC · low latency</div><h3>The robot stops in time</h3>
+      <p>5G schedules the radio in fractions of a millisecond, and with the server at the edge there is no internet round trip.
+        Every millisecond at 29 km/h is 8 mm driven blind.</p>
+      <div class="demo">Demo: “Person crosses road” stop test, chart below</div></div>
+    <div class="card"><div class="tag">MEC · edge computing</div><h3>AI and safety next to the radio</h3>
+      <p>The local UPF breaks traffic out straight to the edge server, so detection and the stop decision happen
+        within the site instead of in a far-away cloud region.</p>
+      <div class="demo">Demo: AI stop latency = 5G round trip + inference only</div></div>
+    <div class="card"><div class="tag">eMBB · high uplink</div><h3>Video from the robot</h3>
+      <p>5G TDD can be configured for heavy uplink, which suits robots that stream camera video to the operator and
+        to the AI. Wi-Fi and 4G uplinks fill up much sooner.</p>
+      <div class="demo">Full project: 720p camera stream over WebRTC</div></div>
+    <div class="card"><div class="tag">QoS · network slicing</div><h3>Control traffic gets priority</h3>
+      <p>5G can give control and safety messages a guaranteed quality-of-service class or their own slice, so a
+        phone uploading video next to the robot cannot starve them, unlike on shared Wi-Fi.</p>
+      <div class="demo">Demo: compare with the “Busy Wi-Fi” profile (spikes, stalls)</div></div>
+    <div class="card"><div class="tag">Private network</div><h3>Secure and on-site</h3>
+      <p>SIM-based authentication and a private core: only registered devices join, and the robot's data never
+        leaves the site.</p>
+      <div class="demo">Lab: Niral 5G core, local breakout to the MEC</div></div>
+    <div class="card"><div class="tag">Mobility &amp; coverage</div><h3>One network across the site</h3>
+      <p>Cells cover hundreds of metres to kilometres, with seamless handover as the robot moves. Wi-Fi access points
+        cover tens of metres and drop connections when roaming.</p>
+      <div class="demo">Demo: the rover crosses a 240 m disaster zone</div></div>
+  </div>
+
+  <h2>How the options compare <small>typical published ranges; real values vary by deployment</small></h2>
+  <table id="cmp"></table>
+
+  <div class="two">
+    <div>
+      <h2>Where the time goes <small>AI stop pipeline</small></h2>
+      <p class="lead">Camera frame up to the AI, inference, stop command back down to the robot.</p>
+      <canvas id="budget" width="560" height="330"></canvas>
+      <p class="note">The private-5G part is the round trip measured live by the headset; the other networks add their
+        typical delay on top (emulated).</p>
+    </div>
+    <div>
+      <h2>Latency becomes metres <small>rover at 29 km/h</small></h2>
+      <p class="lead">Distance driven before the stop arrives (blind) + braking distance. The person is 6.5 m ahead of the bumper.</p>
+      <canvas id="distance" width="560" height="330"></canvas>
+      <p class="note">Braking at 15 m/s² from 8 m/s takes 2.1 m on any network. The difference is the blind part.</p>
+    </div>
+  </div>
+
+  <h2>Measured live in this demo <small>refreshes every 3 s</small></h2>
+  <p class="lead">On the dashboard: pick a <b>Network</b>, drive at full speed, click <b>Person crosses road</b>. Every test and every completed
+    mission appears here, grouped by network.</p>
+  <div class="two">
+    <div><table id="stops"></table></div>
+    <div><table id="missions"></table></div>
+  </div>
+
+  <h2>Architecture</h2>
+  <div class="card" style="padding:10px">
+    <svg viewBox="0 0 1100 250" width="100%" role="img" aria-label="Architecture: headset to 5G to edge server">
+      <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>
+      <g font-size="15" fill="#e2e8f0">
+        <rect x="10" y="70" width="150" height="80" rx="12" fill="#1e293b" stroke="#38bdf8"/>
+        <text x="85" y="102" text-anchor="middle" font-weight="700">Meta Quest</text>
+        <text x="85" y="124" text-anchor="middle" font-size="13" fill="#94a3b8">WebXR operator</text>
+        <rect x="215" y="70" width="150" height="80" rx="12" fill="#1e293b" stroke="#94a3b8"/>
+        <text x="290" y="102" text-anchor="middle" font-weight="700">5G CPE / AP</text>
+        <text x="290" y="124" text-anchor="middle" font-size="13" fill="#94a3b8">Wi-Fi → 5G</text>
+        <rect x="420" y="70" width="170" height="80" rx="12" fill="#1e293b" stroke="#fbbf24"/>
+        <text x="505" y="102" text-anchor="middle" font-weight="700">5G RAN</text>
+        <text x="505" y="124" text-anchor="middle" font-size="13" fill="#94a3b8">LPRU · CU-DU (gNB)</text>
+        <rect x="645" y="70" width="170" height="80" rx="12" fill="#1e293b" stroke="#fbbf24"/>
+        <text x="730" y="102" text-anchor="middle" font-weight="700">5G core</text>
+        <text x="730" y="124" text-anchor="middle" font-size="13" fill="#94a3b8">Niral · local UPF</text>
+        <rect x="870" y="50" width="220" height="120" rx="12" fill="#14301f" stroke="#4ade80" stroke-width="2"/>
+        <text x="980" y="82" text-anchor="middle" font-weight="700">Edge server (MEC)</text>
+        <text x="980" y="106" text-anchor="middle" font-size="13">safety layer · rover sim</text>
+        <text x="980" y="126" text-anchor="middle" font-size="13">AI detection · relay · logs</text>
+        <text x="980" y="150" text-anchor="middle" font-size="13" fill="#4ade80" id="svgRtt">RTT — ms</text>
+        <line x1="160" y1="110" x2="213" y2="110" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="365" y1="110" x2="418" y2="110" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="590" y1="110" x2="643" y2="110" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="815" y1="110" x2="868" y2="110" stroke="#4ade80" stroke-width="3" marker-end="url(#ar)"/>
+        <path d="M730,150 C730,215 860,220 960,220" fill="none" stroke="#f87171" stroke-dasharray="6 6" stroke-width="2"/>
+        <rect x="960" y="200" width="130" height="40" rx="10" fill="#2a1414" stroke="#f87171"/>
+        <text x="1025" y="225" text-anchor="middle" font-size="13" fill="#fca5a5">far cloud region</text>
+        <text x="830" y="240" text-anchor="middle" font-size="12" fill="#fca5a5">without MEC: + internet round trip</text>
+      </g>
+    </svg>
+  </div>
+  <p class="note">How the comparison works: the rover, safety layer and AI really run on the edge server, and the
+    headset really talks to it over the lab's private 5G. The other networks are emulated on top of that real link by
+    adding their typical latency, jitter and packet-loss stalls (TCP-like: in order, a lost packet stalls everything
+    behind it). The values are illustrative and live in <code>server/netctl.py</code>.</p>
+</div>
+<script type="module" src="why5g.js"></script>
+</body>
+</html>
