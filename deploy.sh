@@ -466,35 +466,6 @@ EOF
             warn "Health check timed out. Fetching recent log lines:"
             tail -n 25 "$SCRIPT_DIR/logs/server.log" 2>/dev/null || true
         fi
-
-            info "Waiting for service health check to report OK..."
-            local attempts=0
-            local healthy=false
-            while [ $attempts -lt 25 ]; do
-                if curl -kfsS "https://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null 2>&1 || \
-                   curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/health" >/dev/null 2>&1; then
-                    healthy=true
-                    break
-                fi
-                sleep 1
-                attempts=$((attempts + 1))
-                echo -n "."
-            done
-            echo
-
-            if [ "$healthy" = true ]; then
-                success "5G Remote Hands service is HEALTHY and listening on port ${SERVER_PORT}!"
-            else
-                warn "Health check timed out. Fetching recent service logs:"
-                if command -v sudo >/dev/null 2>&1; then
-                    sudo journalctl -u 5g-remote-hands.service -n 25 --no-pager || true
-                fi
-            fi
-        else
-            info "Starting service directly in background with nohup..."
-            nohup "$SCRIPT_DIR/.venv/bin/python" -m server.main --scenario "$SCENARIO" --port "$SERVER_PORT" > "$SCRIPT_DIR/logs/server.log" 2>&1 &
-            sleep 3
-        fi
     fi
 
     # Print summary and URL endpoints
