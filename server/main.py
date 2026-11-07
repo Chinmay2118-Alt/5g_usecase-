@@ -524,8 +524,6 @@ def main() -> None:
     env_scenario = os.environ.get("SCENARIO", "flood")
     env_port_str = os.environ.get("SERVER_PORT") or os.environ.get("PORT")
     env_port = int(env_port_str) if env_port_str else 8443
-    env_http_str = os.environ.get("HTTP_PORT")
-    env_http = int(env_http_str) if env_http_str else None
     env_host = os.environ.get("SERVER_HOST", "0.0.0.0")
 
     ap = argparse.ArgumentParser(description="5G Remote Hands simulation server")
@@ -533,17 +531,13 @@ def main() -> None:
                     choices=["flood", "earthquake", "wildfire", "landslide", "rescue", "arm"])
     ap.add_argument("--host", default=env_host, help=f"host to bind to (default: {env_host})")
     ap.add_argument("--port", type=int, default=env_port, help=f"HTTPS port (default: {env_port})")
-    ap.add_argument("--http", type=int, default=env_http, metavar="PORT",
+    ap.add_argument("--http", type=int, default=None, metavar="PORT",
                     help="serve plain HTTP on PORT instead (desktop only)")
-    ap.add_argument("--https", action="store_true", help="force secure HTTPS mode on --port (for Meta Quest WebXR)")
     ap.add_argument("--auto-cert", action="store_true", default=True,
                     help="automatically generate self-signed cert if missing (default: True)")
     ap.add_argument("--no-auto-cert", dest="auto_cert", action="store_false")
     args = ap.parse_args()
     _high_res_timer()
-
-    if args.https:
-        args.http = None
 
     ctx, port, scheme = None, args.port, "https"
     if args.http:
