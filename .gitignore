@@ -1,5 +1,32 @@
+# Virtual environments
 .venv/
+venv/
+env/
+
+# Python byte-code and caches
 __pycache__/
+*.py[cod]
+*$py.class
 .pytest_cache/
-certs/
-logs/
+
+# Local certificates and credentials (generated at runtime on 5G server)
+certs/*.pem
+!certs/.gitkeep
+
+# Telemetry, CSV runs, and experiment logs
+logs/*
+!logs/.gitkeep
+
+# Environment secrets and server-specific configs
+.env
+.env.local
+.env.*.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

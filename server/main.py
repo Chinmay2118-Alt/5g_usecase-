@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import random
 import ssl
 import sys
@@ -34,7 +35,7 @@ from pathlib import Path
 from aiohttp import WSMsgType, web
 
 from . import protocol as P
-from .certs import CERT, KEY, local_ipv4s
+from .certs import CERT, KEY, local_ipv4s, make_cert
 from .logger import RunLogger
 from .netctl import PROFILES, STALE_S, DelayLine, NetCtl, profiles_json
 from .safety import Safety
@@ -456,6 +457,16 @@ def make_app(scenario: str = "flood") -> web.Application:
                                   "base_rtt_ms": srv.base_rtt_ms, "client_rtt": srv.client_rtt,
                                   "results": srv.results})
 
+    async def health(_request):
+        return web.json_response({
+            "status": "ok",
+            "scenario": srv.world.name,
+            "uptime_s": round(srv.rel(srv.now()), 1),
+            "operator_connected": srv.operator is not None,
+            "dashboards_connected": len(srv.dashboards),
+            "safety_state": srv.safety.state,
+        })
+
     async def no_icon(_request):
         return web.Response(status=204)
 
@@ -468,12 +479,33 @@ def make_app(scenario: str = "flood") -> web.Application:
     app.router.add_get("/ws/dashboard", srv.ws_dashboard)
     app.router.add_get("/api/status", status)
     app.router.add_get("/api/results", results)
+    app.router.add_get("/api/health", health)
+    app.router.add_get("/healthz", health)
     for name in PAGES + ["vendor", "common"]:
         if (WEB / name).is_dir():
             app.router.add_static(f"/{name}", WEB / name)
     app.on_startup.append(srv.on_startup)
     app.on_cleanup.append(srv.on_cleanup)
     return app
+
+
+def _load_dotenv(path: Path | None = None) -> None:
+    env_file = path if path is not None else Path(__file__).resolve().parent.parent / ".env"
+    if not env_file.is_file():
+        return
+    try:
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip("'\"")
+                if k and k not in os.environ:
+                    os.environ[k] = v
+    except OSError:
+        pass
 
 
 def _high_res_timer() -> None:
@@ -488,11 +520,24 @@ def _high_res_timer() -> None:
 
 
 def main() -> None:
+    _load_dotenv()
+    env_scenario = os.environ.get("SCENARIO", "flood")
+    env_port_str = os.environ.get("SERVER_PORT") or os.environ.get("PORT")
+    env_port = int(env_port_str) if env_port_str else 8443
+    env_http_str = os.environ.get("HTTP_PORT")
+    env_http = int(env_http_str) if env_http_str else None
+    env_host = os.environ.get("SERVER_HOST", "0.0.0.0")
+
     ap = argparse.ArgumentParser(description="5G Remote Hands simulation server")
-    ap.add_argument("--scenario", default="flood",
+    ap.add_argument("--scenario", default=env_scenario,
                     choices=["flood", "earthquake", "wildfire", "landslide", "rescue", "arm"])
-    ap.add_argument("--port", type=int, default=8443)
-    ap.add_argument("--http", type=int, metavar="PORT", help="serve plain HTTP on PORT instead (desktop only)")
+    ap.add_argument("--host", default=env_host, help=f"host to bind to (default: {env_host})")
+    ap.add_argument("--port", type=int, default=env_port, help=f"HTTPS port (default: {env_port})")
+    ap.add_argument("--http", type=int, default=env_http, metavar="PORT",
+                    help="serve plain HTTP on PORT instead (desktop only)")
+    ap.add_argument("--auto-cert", action="store_true", default=True,
+                    help="automatically generate self-signed cert if missing (default: True)")
+    ap.add_argument("--no-auto-cert", dest="auto_cert", action="store_false")
     args = ap.parse_args()
     _high_res_timer()
 
@@ -501,7 +546,12 @@ def main() -> None:
         port, scheme = args.http, "http"
     else:
         if not (CERT.exists() and KEY.exists()):
-            sys.exit("No certificate. Run:  python -m server.certs")
+            auto_gen = args.auto_cert and (os.environ.get("AUTO_GEN_CERT", "1").lower() in ("1", "true", "yes"))
+            if auto_gen:
+                print("TLS certificates not found. Generating self-signed certificate...")
+                make_cert()
+            else:
+                sys.exit("No certificate. Run:  python -m server.certs")
         ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ctx.load_cert_chain(CERT, KEY)
 
@@ -514,7 +564,7 @@ def main() -> None:
         print(f"  Operator (Quest): {scheme}://{ip}:{port}{world.client_path}")
         print(f"  Dashboard:        {scheme}://{ip}:{port}{world.dashboard_path}")
     print()
-    web.run_app(app, host="0.0.0.0", port=port, ssl_context=ctx, print=None)
+    web.run_app(app, host=args.host, port=port, ssl_context=ctx, print=None)
 
 
 if __name__ == "__main__":

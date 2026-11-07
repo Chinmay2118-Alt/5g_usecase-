@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import ipaddress
+import os
 import socket
 from pathlib import Path
 
@@ -16,7 +17,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-CERT_DIR = Path(__file__).resolve().parent.parent / "certs"
+DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / "certs"
+CERT_DIR = Path(os.environ.get("CERT_DIR", str(DEFAULT_CERT_DIR)))
 CERT = CERT_DIR / "cert.pem"
 KEY = CERT_DIR / "key.pem"
 
@@ -38,12 +40,34 @@ def local_ipv4s() -> list[str]:
     return sorted(ips)
 
 
-def make_cert(extra_ips: list[str]) -> list[str]:
-    ips = sorted(set(local_ipv4s()) | set(extra_ips) | {"127.0.0.1"})
+def make_cert(extra_ips: list[str] | None = None) -> list[str]:
+    env_hosts: list[str] = []
+    for var in ("SERVER_IP", "EXTRA_IPS"):
+        val = os.environ.get(var, "").strip()
+        if val:
+            for item in val.replace(",", " ").split():
+                if item:
+                    env_hosts.append(item)
+
+    combined = set(local_ipv4s()) | {"127.0.0.1"} | set(extra_ips or []) | set(env_hosts)
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "5G Remote Hands (dev)")])
-    san = [x509.DNSName("localhost"), x509.DNSName(socket.gethostname())]
-    san += [x509.IPAddress(ipaddress.ip_address(ip)) for ip in ips]
+
+    san: list[x509.GeneralName] = [
+        x509.DNSName("localhost"),
+        x509.DNSName(socket.gethostname()),
+    ]
+    recorded_names: list[str] = []
+
+    for item in sorted(combined):
+        try:
+            ip_obj = ipaddress.ip_address(item)
+            san.append(x509.IPAddress(ip_obj))
+            recorded_names.append(str(ip_obj))
+        except ValueError:
+            san.append(x509.DNSName(item))
+            recorded_names.append(item)
+
     now = dt.datetime.now(dt.timezone.utc)
     cert = (
         x509.CertificateBuilder()
@@ -56,16 +80,17 @@ def make_cert(extra_ips: list[str]) -> list[str]:
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
         .sign(key, hashes.SHA256())
     )
-    CERT_DIR.mkdir(exist_ok=True)
+    CERT_DIR.mkdir(parents=True, exist_ok=True)
     KEY.write_bytes(key.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     CERT.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    return ips
+    return recorded_names
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--ip", action="append", default=[], help="extra IP to include (repeatable)")
+    ap.add_argument("--ip", action="append", default=[], help="extra IP or DNS hostname to include (repeatable)")
     args = ap.parse_args()
     ips = make_cert(args.ip)
     print(f"Wrote {CERT} and {KEY} for: {', '.join(ips)}")
+

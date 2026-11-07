@@ -1,0 +1,25 @@
+# Git & VCS
+.git/
+.gitignore
+
+# Python artifacts
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Runtime data & secrets
+certs/*.pem
+logs/*
+!logs/.gitkeep
+.env
+.env.local
+
+# OS specific
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,36 @@
+[Unit]
+Description=5G Remote Hands — VR Teleoperation Simulation Service (5G MEC)
+Documentation=https://github.com/Chinmay2118-Alt/5g_usecase-
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User running the service (replaced automatically by deploy.sh or set to your user)
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/5g-remote-hands
+
+# Load dynamic runtime environment variables if available
+EnvironmentFile=-/opt/5g-remote-hands/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Execution command pointing to virtualenv
+ExecStartPre=/bin/sh -c 'if [ ! -f /opt/5g-remote-hands/certs/cert.pem ]; then /opt/5g-remote-hands/.venv/bin/python -m server.certs; fi'
+ExecStart=/opt/5g-remote-hands/.venv/bin/python -m server.main
+
+# Resilience: automatically restart on failure or crash
+Restart=always
+RestartSec=3s
+
+# Resource limits for low-latency high-concurrency 5G packet streams
+LimitNOFILE=65535
+
+# Graceful termination
+TimeoutStopSec=10
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
+
