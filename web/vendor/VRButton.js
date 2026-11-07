@@ -167,8 +167,9 @@ class VRButton {
 
 			if ( window.isSecureContext === false ) {
 
-				message.href = document.location.href.replace( /^http:/, 'https:' );
-				message.innerHTML = 'WEBXR NEEDS HTTPS'; // TODO Improve message
+				const port = (location.port === '8080' || location.port === '80' || !location.port) ? ':8443' : ':' + location.port;
+				message.href = 'https://' + location.hostname + port + location.pathname + location.search;
+				message.innerHTML = 'SWITCH TO HTTPS (VR)';
 
 			} else {
 
