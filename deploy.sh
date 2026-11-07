@@ -367,15 +367,30 @@ EOF
         # Bare-metal Deployment
         info "Executing Bare-Metal deployment on host..."
 
-        # Setup virtualenv if missing
-        if [ ! -d "$SCRIPT_DIR/.venv" ]; then
+        # Setup virtualenv if missing or incomplete
+        if [ ! -f "$SCRIPT_DIR/.venv/bin/python" ] || [ ! -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
+            rm -rf "$SCRIPT_DIR/.venv"
             info "Creating Python virtual environment in $SCRIPT_DIR/.venv..."
-            python3 -m venv "$SCRIPT_DIR/.venv"
+            if ! python3 -m venv "$SCRIPT_DIR/.venv" 2>/dev/null; then
+                if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+                    info "Installing python3-venv and python3-pip packages..."
+                    sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv python3-pip python3.10-venv || true
+                    python3 -m venv "$SCRIPT_DIR/.venv" 2>/dev/null || true
+                fi
+            fi
+        fi
+
+        # Determine python and pip binaries (venv if available, system python fallback)
+        local py_bin="python3"
+        local pip_bin="python3 -m pip"
+        if [ -f "$SCRIPT_DIR/.venv/bin/python" ] && [ -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
+            py_bin="$SCRIPT_DIR/.venv/bin/python"
+            pip_bin="$SCRIPT_DIR/.venv/bin/pip"
         fi
 
         info "Installing / updating Python dependencies..."
-        "$SCRIPT_DIR/.venv/bin/pip" install --upgrade pip >/dev/null
-        "$SCRIPT_DIR/.venv/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+        $pip_bin install --upgrade pip >/dev/null 2>&1 || true
+        $pip_bin install -r "$SCRIPT_DIR/requirements.txt"
 
         info "Generating self-signed TLS certificates for 5G endpoints..."
         local cert_args=()
@@ -385,7 +400,7 @@ EOF
                 cert_args+=(--ip "$e_ip")
             done
         fi
-        "$SCRIPT_DIR/.venv/bin/python" -m server.certs "${cert_args[@]}"
+        "$py_bin" -m server.certs "${cert_args[@]}"
 
         local actual_user="${SUDO_USER:-$(whoami)}"
         local actual_group
@@ -398,6 +413,7 @@ EOF
             tmp_svc="$(mktemp)"
             sed -e "s|User=ubuntu|User=${actual_user}|g" \
                 -e "s|Group=ubuntu|Group=${actual_group}|g" \
+                -e "s|/opt/5g-remote-hands/.venv/bin/python|$py_bin|g" \
                 -e "s|/opt/5g-remote-hands|$SCRIPT_DIR|g" \
                 "$SCRIPT_DIR/5g-remote-hands.service" > "$tmp_svc"
 
