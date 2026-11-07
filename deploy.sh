@@ -367,30 +367,31 @@ EOF
         # Bare-metal Deployment
         info "Executing Bare-Metal deployment on host..."
 
-        # Setup virtualenv if missing or incomplete
-        if [ ! -f "$SCRIPT_DIR/.venv/bin/python" ] || [ ! -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
-            rm -rf "$SCRIPT_DIR/.venv"
-            info "Creating Python virtual environment in $SCRIPT_DIR/.venv..."
-            if ! python3 -m venv "$SCRIPT_DIR/.venv" 2>/dev/null; then
-                if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-                    info "Installing python3-venv and python3-pip packages..."
-                    sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv python3-pip python3.10-venv || true
-                    python3 -m venv "$SCRIPT_DIR/.venv" 2>/dev/null || true
-                fi
-            fi
-        fi
-
-        # Determine python and pip binaries (venv if available, system python fallback)
+        # Determine python and pip binaries
         local py_bin="python3"
         local pip_bin="python3 -m pip"
+
+        # Try setting up virtualenv only if python3-venv is already functional
+        if [ ! -f "$SCRIPT_DIR/.venv/bin/python" ] || [ ! -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
+            rm -rf "$SCRIPT_DIR/.venv"
+            python3 -m venv "$SCRIPT_DIR/.venv" 2>/dev/null || true
+        fi
+
         if [ -f "$SCRIPT_DIR/.venv/bin/python" ] && [ -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
             py_bin="$SCRIPT_DIR/.venv/bin/python"
             pip_bin="$SCRIPT_DIR/.venv/bin/pip"
+            info "Using virtual environment Python: $py_bin"
+        else
+            info "Using user Python environment: $py_bin (zero sudo required)"
+            pip_bin="python3 -m pip"
         fi
 
         info "Installing / updating Python dependencies..."
-        $pip_bin install --upgrade pip >/dev/null 2>&1 || true
-        $pip_bin install -r "$SCRIPT_DIR/requirements.txt"
+        if [ "$pip_bin" = "python3 -m pip" ]; then
+            $pip_bin install --user -r "$SCRIPT_DIR/requirements.txt" || $pip_bin install -r "$SCRIPT_DIR/requirements.txt"
+        else
+            $pip_bin install -r "$SCRIPT_DIR/requirements.txt"
+        fi
 
         info "Generating self-signed TLS certificates for 5G endpoints..."
         local cert_args=()
@@ -402,13 +403,19 @@ EOF
         fi
         "$py_bin" -m server.certs "${cert_args[@]}"
 
-        local actual_user="${SUDO_USER:-$(whoami)}"
-        local actual_group
-        actual_group="$(id -gn "$actual_user" 2>/dev/null || echo "$actual_user")"
+        # Check if passwordless sudo is available for systemd
+        local can_sudo=false
+        if [ -w /etc/systemd/system ]; then
+            can_sudo=true
+        elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            can_sudo=true
+        fi
 
-        # Install systemd service if systemctl exists
-        if command -v systemctl >/dev/null 2>&1; then
+        if [ "$can_sudo" = true ] && command -v systemctl >/dev/null 2>&1; then
             info "Configuring systemd service /etc/systemd/system/5g-remote-hands.service..."
+            local actual_user="${SUDO_USER:-$(whoami)}"
+            local actual_group
+            actual_group="$(id -gn "$actual_user" 2>/dev/null || echo "$actual_user")"
             local tmp_svc
             tmp_svc="$(mktemp)"
             sed -e "s|User=ubuntu|User=${actual_user}|g" \
@@ -422,13 +429,43 @@ EOF
                 systemctl daemon-reload
                 systemctl enable 5g-remote-hands.service
                 systemctl restart 5g-remote-hands.service
-            elif command -v sudo >/dev/null 2>&1; then
+            else
                 sudo cp "$tmp_svc" /etc/systemd/system/5g-remote-hands.service
                 sudo systemctl daemon-reload
                 sudo systemctl enable 5g-remote-hands.service
                 sudo systemctl restart 5g-remote-hands.service
             fi
             rm -f "$tmp_svc"
+        else
+            info "Running in user-space background mode (zero sudo required)..."
+            # Kill existing instance if running on the same port
+            pkill -f "server.main.*$SERVER_PORT" 2>/dev/null || true
+            mkdir -p "$SCRIPT_DIR/logs"
+            nohup "$py_bin" -m server.main --scenario "$SCENARIO" --port "$SERVER_PORT" > "$SCRIPT_DIR/logs/server.log" 2>&1 &
+            sleep 2
+        fi
+
+        info "Waiting for service health check to report OK..."
+        local attempts=0
+        local healthy=false
+        while [ $attempts -lt 25 ]; do
+            if curl -kfsS "https://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null 2>&1 || \
+               curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/health" >/dev/null 2>&1; then
+                healthy=true
+                break
+            fi
+            sleep 1
+            attempts=$((attempts + 1))
+            echo -n "."
+        done
+        echo
+
+        if [ "$healthy" = true ]; then
+            success "5G Remote Hands service is HEALTHY and listening on port ${SERVER_PORT}!"
+        else
+            warn "Health check timed out. Fetching recent log lines:"
+            tail -n 25 "$SCRIPT_DIR/logs/server.log" 2>/dev/null || true
+        fi
 
             info "Waiting for service health check to report OK..."
             local attempts=0
