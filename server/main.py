@@ -535,11 +535,15 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=env_port, help=f"HTTPS port (default: {env_port})")
     ap.add_argument("--http", type=int, default=env_http, metavar="PORT",
                     help="serve plain HTTP on PORT instead (desktop only)")
+    ap.add_argument("--https", action="store_true", help="force secure HTTPS mode on --port (for Meta Quest WebXR)")
     ap.add_argument("--auto-cert", action="store_true", default=True,
                     help="automatically generate self-signed cert if missing (default: True)")
     ap.add_argument("--no-auto-cert", dest="auto_cert", action="store_false")
     args = ap.parse_args()
     _high_res_timer()
+
+    if args.https:
+        args.http = None
 
     ctx, port, scheme = None, args.port, "https"
     if args.http:

@@ -322,7 +322,6 @@ deploy_local() {
     cat > "$SCRIPT_DIR/.env" <<EOF
 SERVER_HOST=0.0.0.0
 SERVER_PORT=$SERVER_PORT
-HTTP_PORT=$HTTP_PORT
 SCENARIO=$SCENARIO
 SERVER_IP=$SERVER_IP
 EXTRA_IPS=$EXTRA_IPS
@@ -441,7 +440,7 @@ EOF
             # Kill existing instance if running on the same port
             pkill -f "server.main.*$SERVER_PORT" 2>/dev/null || true
             mkdir -p "$SCRIPT_DIR/logs"
-            nohup "$py_bin" -m server.main --scenario "$SCENARIO" --port "$SERVER_PORT" > "$SCRIPT_DIR/logs/server.log" 2>&1 &
+            nohup "$py_bin" -m server.main --scenario "$SCENARIO" --port "$SERVER_PORT" --https > "$SCRIPT_DIR/logs/server.log" 2>&1 &
             sleep 2
         fi
 
